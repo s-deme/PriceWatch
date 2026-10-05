@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: pricewatch
+      POSTGRES_PASSWORD: pricewatch
+      POSTGRES_DB: pricewatch
+    ports: ['127.0.0.1:5434:5432']
+    volumes: ['pgdata:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U pricewatch']
+      interval: 5s
+      timeout: 5s
+      retries: 15
+  web:
+    build: .
+    ports: ['127.0.0.1:3000:3000']
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://pricewatch:pricewatch@db:5432/pricewatch?schema=public
+    depends_on:
+      db: { condition: service_healthy }
+    command: sh -c "npm run db:migrate && npm run start"
+  worker:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://pricewatch:pricewatch@db:5432/pricewatch?schema=public
+    depends_on:
+      db: { condition: service_healthy }
+    command: sh -c "npm run db:migrate && npm run worker"
+volumes:
+  pgdata:

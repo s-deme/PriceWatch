@@ -1,0 +1,202 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model Category {
+  id String @id @default(cuid())
+  name String @unique
+  parentId String?
+  parent Category? @relation("Tree", fields: [parentId], references: [id])
+  children Category[] @relation("Tree")
+  products Product[]
+}
+model Product {
+  id String @id @default(cuid())
+  name String
+  normalizedName String
+  manufacturer String
+  modelNumber String?
+  janCode String? @unique
+  upc String? @unique
+  description String @default("")
+  imageUrl String @default("/product.svg")
+  categoryId String
+  category Category @relation(fields: [categoryId], references: [id])
+  listings Listing[]
+  watchlist Watchlist?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([manufacturer, modelNumber])
+  @@index([normalizedName])
+  @@index([categoryId])
+}
+model Store {
+  id String @id @default(cuid())
+  name String @unique
+  domain String @unique
+  country String @default("JP")
+  currency String @default("JPY")
+  active Boolean @default(true)
+  listings Listing[]
+  coupons Coupon[]
+}
+model Source {
+  id String @id
+  name String
+  kind String
+  trust Int @default(50)
+  active Boolean @default(true)
+  listings Listing[]
+  deals Deal[]
+  jobs JobRun[]
+}
+model Listing {
+  id String @id @default(cuid())
+  productId String
+  product Product @relation(fields: [productId], references: [id])
+  storeId String
+  store Store @relation(fields: [storeId], references: [id])
+  sourceId String
+  source Source @relation(fields: [sourceId], references: [id])
+  externalId String?
+  title String
+  url String
+  currentPrice Int
+  regularPrice Int?
+  shippingPrice Int?
+  couponDiscount Int @default(0)
+  couponId String?
+  coupon Coupon? @relation(fields: [couponId], references: [id])
+  points Int @default(0)
+  paymentPrice Int?
+  effectivePrice Int?
+  currency String @default("JPY")
+  stockStatus String @default("in_stock")
+  status String @default("unverified")
+  active Boolean @default(true)
+  lastCheckedAt DateTime?
+  score Int @default(0)
+  scoreReasons Json @default("[]")
+  historicalLow Boolean @default(false)
+  priceDrop Boolean @default(false)
+  discountRate Int @default(0)
+  history PriceHistory[]
+  deals Deal[]
+  createdAt DateTime @default(now())
+  @@unique([storeId, externalId])
+  @@unique([storeId, url])
+  @@index([productId, currency, active, paymentPrice])
+  @@index([score, id])
+}
+model PriceHistory {
+  id String @id @default(cuid())
+  listingId String
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  sourceId String
+  price Int
+  shippingPrice Int?
+  couponDiscount Int @default(0)
+  points Int @default(0)
+  paymentPrice Int?
+  effectivePrice Int?
+  currency String
+  stockStatus String
+  recordedAt DateTime
+  @@unique([listingId, recordedAt])
+  @@index([listingId, currency, recordedAt])
+}
+model Deal {
+  id String @id @default(cuid())
+  listingId String
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  sourceId String
+  source Source @relation(fields: [sourceId], references: [id])
+  salePrice Int
+  originalPrice Int?
+  discountRate Int
+  effectivePrice Int?
+  dealScore Int
+  startAt DateTime @default(now())
+  endAt DateTime?
+  active Boolean @default(true)
+  fingerprint String @unique
+  eventId String?
+  event SaleEvent? @relation(fields: [eventId], references: [id])
+  @@index([listingId, active])
+  @@index([active, endAt])
+}
+model Coupon {
+  id String @id @default(cuid())
+  storeId String
+  store Store @relation(fields: [storeId], references: [id])
+  code String
+  title String
+  discountType String
+  discountValue Int
+  minimumPurchase Int @default(0)
+  startAt DateTime
+  endAt DateTime
+  url String
+  description String @default("")
+  listings Listing[]
+  @@unique([storeId, code])
+}
+model SaleEvent {
+  id String @id @default(cuid())
+  name String
+  description String @default("")
+  startAt DateTime
+  endAt DateTime
+  deals Deal[]
+}
+model Watchlist {
+  id String @id @default(cuid())
+  productId String @unique
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  targetPrice Int?
+  discountThreshold Int?
+  notifyLowestPrice Boolean @default(false)
+  notifyDeal Boolean @default(true)
+  lastState String @default("")
+  createdAt DateTime @default(now())
+}
+model KeywordWatch {
+  id String @id @default(cuid())
+  include String
+  exclude String @default("")
+  createdAt DateTime @default(now())
+}
+model Notification {
+  id String @id @default(cuid())
+  dedupeKey String @unique
+  title String
+  href String
+  read Boolean @default(false)
+  createdAt DateTime @default(now())
+}
+model JobRun {
+  id String @id @default(cuid())
+  sourceId String
+  source Source @relation(fields: [sourceId], references: [id])
+  status String @default("queued")
+  fetched Int @default(0)
+  failed Int @default(0)
+  duration Int @default(0)
+  error String?
+  createdAt DateTime @default(now())
+  startedAt DateTime?
+  finishedAt DateTime?
+  @@index([status, createdAt])
+}
+model Session {
+  id String @id
+  expiresAt DateTime
+}
+model RateLimit {
+  key String @id
+  count Int
+  resetAt DateTime
+}
